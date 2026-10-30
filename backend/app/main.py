@@ -11,10 +11,10 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Set CORS origins
+# Set CORS origins dynamically to allow credentials with any localhost/web origin
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -22,13 +22,14 @@ app.add_middleware(
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    # Log exception internally and return clean user message without exposing internal stack traces
     return JSONResponse(
         status_code=500,
-        content={"detail": "An internal server error occurred. Please try again later."}
+        content={"detail": f"An internal server error occurred: {str(exc)}"}
     )
 
+# Mount router under both /api/v1 and /api for full route compatibility
 app.include_router(api_router, prefix=settings.API_V1_STR)
+app.include_router(api_router, prefix="/api")
 
 @app.get("/")
 def root():
