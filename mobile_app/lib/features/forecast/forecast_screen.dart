@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/forecast_provider.dart';
+import '../../providers/menu_provider.dart';
 import '../../shared/widgets/reusable_widgets.dart';
 
 class ForecastScreen extends StatefulWidget {
@@ -15,11 +16,15 @@ class ForecastScreen extends StatefulWidget {
 class _ForecastScreenState extends State<ForecastScreen> {
   DateTime _selectedDate = DateTime.now();
   String _selectedMealType = 'LUNCH';
+  String? _selectedMenuId;
 
   @override
   void initState() {
     super.initState();
-    _fetchForecast();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<MenuProvider>(context, listen: false).fetchMenus();
+      _fetchForecast();
+    });
   }
 
   void _fetchForecast() {
@@ -37,7 +42,13 @@ class _ForecastScreenState extends State<ForecastScreen> {
   @override
   Widget build(BuildContext context) {
     final forecastProvider = Provider.of<ForecastProvider>(context);
+    final menuProvider = Provider.of<MenuProvider>(context);
     final res = forecastProvider.forecastResult;
+
+    final targetDateStr = _selectedDate.toIso8601String().split('T')[0];
+    final matchingMenus = menuProvider.menus.where(
+      (m) => m.date == targetDateStr && m.mealType == _selectedMealType
+    ).toList();
 
     return Scaffold(
       appBar: AppBar(title: const Text("AI Demand Forecasting")),
@@ -52,7 +63,7 @@ class _ForecastScreenState extends State<ForecastScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("Select Forecast Target", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const Text("Select Target Meal", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 16),
                     Row(
                       children: [
@@ -63,11 +74,15 @@ class _ForecastScreenState extends State<ForecastScreen> {
                             items: const [
                               DropdownMenuItem(value: 'BREAKFAST', child: Text("Breakfast")),
                               DropdownMenuItem(value: 'LUNCH', child: Text("Lunch")),
+                              DropdownMenuItem(value: 'SNACK', child: Text("Snacks")),
                               DropdownMenuItem(value: 'DINNER', child: Text("Dinner")),
                             ],
                             onChanged: (v) {
                               if (v != null) {
-                                setState(() => _selectedMealType = v);
+                                setState(() {
+                                  _selectedMealType = v;
+                                  _selectedMenuId = null;
+                                });
                                 _fetchForecast();
                               }
                             },
@@ -84,7 +99,10 @@ class _ForecastScreenState extends State<ForecastScreen> {
                                 lastDate: DateTime.now().add(const Duration(days: 30)),
                               );
                               if (p != null) {
-                                setState(() => _selectedDate = p);
+                                setState(() {
+                                  _selectedDate = p;
+                                  _selectedMenuId = null;
+                                });
                                 _fetchForecast();
                               }
                             },
@@ -95,6 +113,51 @@ class _ForecastScreenState extends State<ForecastScreen> {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    if (matchingMenus.isNotEmpty) ...[
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedMenuId ?? matchingMenus.first.id,
+                        decoration: const InputDecoration(labelText: "Scheduled Meal / Menu"),
+                        items: matchingMenus.map((m) {
+                          return DropdownMenuItem<String>(
+                            value: m.id,
+                            child: Text(m.menuName, overflow: TextOverflow.ellipsis),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) setState(() => _selectedMenuId = val);
+                        },
+                      ),
+                    ] else ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.amber.shade200),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.amber),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                "No scheduled menu found for this date & meal slot. The forecast will run using general attendance data.",
+                                style: TextStyle(fontSize: 12, color: AppColors.textMain),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: forecastProvider.isLoading ? null : _fetchForecast,
+                      icon: const Icon(Icons.auto_awesome),
+                      label: const Text("Generate AI Demand Forecast"),
                     ),
                   ],
                 ),

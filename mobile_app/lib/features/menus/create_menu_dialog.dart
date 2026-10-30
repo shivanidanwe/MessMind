@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../models/models.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/menu_provider.dart';
 
 class CreateMenuDialog extends StatefulWidget {
-  const CreateMenuDialog({super.key});
+  final Menu? menuToEdit;
+
+  const CreateMenuDialog({super.key, this.menuToEdit});
 
   @override
   State<CreateMenuDialog> createState() => _CreateMenuDialogState();
@@ -13,12 +16,35 @@ class CreateMenuDialog extends StatefulWidget {
 
 class _CreateMenuDialogState extends State<CreateMenuDialog> {
   final _formKey = GlobalKey<FormState>();
-  String _selectedMealType = 'BREAKFAST';
-  DateTime _selectedDate = DateTime.now();
+  late String _selectedMealType;
+  late DateTime _selectedDate;
   final _menuNameController = TextEditingController();
   final _specialNotesController = TextEditingController();
+  List<TextEditingController> _itemControllers = [];
 
-  final List<TextEditingController> _itemControllers = [TextEditingController()];
+  @override
+  void initState() {
+    super.initState();
+    if (widget.menuToEdit != null) {
+      final m = widget.menuToEdit!;
+      _selectedMealType = m.mealType;
+      try {
+        _selectedDate = DateTime.parse(m.date);
+      } catch (_) {
+        _selectedDate = DateTime.now();
+      }
+      _menuNameController.text = m.menuName;
+      _specialNotesController.text = m.specialNotes ?? '';
+      _itemControllers = m.items.map((i) => TextEditingController(text: i.itemName)).toList();
+      if (_itemControllers.isEmpty) {
+        _itemControllers.add(TextEditingController());
+      }
+    } else {
+      _selectedMealType = 'BREAKFAST';
+      _selectedDate = DateTime.now();
+      _itemControllers = [TextEditingController()];
+    }
+  }
 
   void _addItemField() {
     setState(() {
@@ -53,19 +79,32 @@ class _CreateMenuDialogState extends State<CreateMenuDialog> {
       }
     }
 
-    final success = await menuProvider.createMenu(
-      messId: messId,
-      date: formattedDate,
-      mealType: _selectedMealType,
-      menuName: _menuNameController.text.trim(),
-      specialNotes: _specialNotesController.text.trim(),
-      items: items,
-    );
+    bool success;
+    if (widget.menuToEdit != null) {
+      success = await menuProvider.updateMenu(
+        menuId: widget.menuToEdit!.id,
+        menuName: _menuNameController.text.trim(),
+        specialNotes: _specialNotesController.text.trim(),
+        items: items,
+      );
+    } else {
+      success = await menuProvider.createMenu(
+        messId: messId,
+        date: formattedDate,
+        mealType: _selectedMealType,
+        menuName: _menuNameController.text.trim(),
+        specialNotes: _specialNotesController.text.trim(),
+        items: items,
+      );
+    }
 
     if (success && mounted) {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Menu created successfully!"), backgroundColor: AppColors.success),
+        SnackBar(
+          content: Text(widget.menuToEdit != null ? "Meal updated successfully!" : "Meal created successfully!"),
+          backgroundColor: AppColors.success,
+        ),
       );
     } else if (mounted && menuProvider.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -77,9 +116,10 @@ class _CreateMenuDialogState extends State<CreateMenuDialog> {
   @override
   Widget build(BuildContext context) {
     final formattedDate = _selectedDate.toIso8601String().split('T')[0];
+    final isEditing = widget.menuToEdit != null;
 
     return AlertDialog(
-      title: const Text("Create New Menu"),
+      title: Text(isEditing ? "Edit Meal Menu" : "Add New Meal Menu"),
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
@@ -90,46 +130,54 @@ class _CreateMenuDialogState extends State<CreateMenuDialog> {
               const Text("Meal Slot", style: TextStyle(fontWeight: FontWeight.bold)),
               DropdownButtonFormField<String>(
                 initialValue: _selectedMealType,
+                decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
                 items: const [
                   DropdownMenuItem(value: 'BREAKFAST', child: Text("Breakfast")),
                   DropdownMenuItem(value: 'LUNCH', child: Text("Lunch")),
+                  DropdownMenuItem(value: 'SNACK', child: Text("Snacks")),
                   DropdownMenuItem(value: 'DINNER', child: Text("Dinner")),
                 ],
-                onChanged: (val) {
-                  if (val != null) setState(() => _selectedMealType = val);
-                },
+                onChanged: isEditing
+                    ? null
+                    : (val) {
+                        if (val != null) setState(() => _selectedMealType = val);
+                      },
               ),
               const SizedBox(height: 12),
 
               const Text("Date", style: TextStyle(fontWeight: FontWeight.bold)),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text(formattedDate),
-                trailing: const Icon(Icons.calendar_today),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _selectedDate,
-                    firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                    lastDate: DateTime.now().add(const Duration(days: 30)),
-                  );
-                  if (picked != null) setState(() => _selectedDate = picked);
-                },
+                title: Text(formattedDate, style: const TextStyle(fontWeight: FontWeight.bold)),
+                trailing: const Icon(Icons.calendar_today, color: AppColors.primary),
+                onTap: isEditing
+                    ? null
+                    : () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _selectedDate,
+                          firstDate: DateTime.now().subtract(const Duration(days: 30)),
+                          lastDate: DateTime.now().add(const Duration(days: 30)),
+                        );
+                        if (picked != null) setState(() => _selectedDate = picked);
+                      },
               ),
               const SizedBox(height: 12),
 
-              const Text("Menu Name / Title", style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text("Meal / Menu Name", style: TextStyle(fontWeight: FontWeight.bold)),
               TextFormField(
                 controller: _menuNameController,
-                decoration: const InputDecoration(hintText: "e.g. Special South Indian Thali"),
-                validator: (v) => v == null || v.trim().isEmpty ? "Menu name required" : null,
+                decoration: const InputDecoration(
+                  hintText: "e.g. Special South Indian Thali",
+                ),
+                validator: (v) => v == null || v.trim().isEmpty ? "Meal name required" : null,
               ),
               const SizedBox(height: 12),
 
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text("Food Items", style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text("Food Items / Dishes", style: TextStyle(fontWeight: FontWeight.bold)),
                   TextButton.icon(
                     onPressed: _addItemField,
                     icon: const Icon(Icons.add, size: 18),
@@ -150,7 +198,7 @@ class _CreateMenuDialogState extends State<CreateMenuDialog> {
                           decoration: InputDecoration(
                             hintText: "Item ${idx + 1} (e.g. Paneer Butter Masala)",
                           ),
-                          validator: (v) => idx == 0 && (v == null || v.trim().isEmpty) ? "At least 1 item required" : null,
+                          validator: (v) => idx == 0 && (v == null || v.trim().isEmpty) ? "At least 1 food item required" : null,
                         ),
                       ),
                       if (_itemControllers.length > 1)
@@ -164,10 +212,10 @@ class _CreateMenuDialogState extends State<CreateMenuDialog> {
               }),
 
               const SizedBox(height: 12),
-              const Text("Special Notes (Optional)", style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text("Description / Notes (Optional)", style: TextStyle(fontWeight: FontWeight.bold)),
               TextFormField(
                 controller: _specialNotesController,
-                decoration: const InputDecoration(hintText: "e.g. Festival Special Menu"),
+                decoration: const InputDecoration(hintText: "e.g. Served with fresh curd and pickles"),
               ),
             ],
           ),
@@ -180,7 +228,7 @@ class _CreateMenuDialogState extends State<CreateMenuDialog> {
         ),
         ElevatedButton(
           onPressed: _submit,
-          child: const Text("Save Menu"),
+          child: Text(isEditing ? "Update Meal" : "Save Meal"),
         ),
       ],
     );

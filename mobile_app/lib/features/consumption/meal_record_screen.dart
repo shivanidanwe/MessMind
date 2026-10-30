@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/meal_provider.dart';
+import '../../providers/menu_provider.dart';
 import '../../shared/widgets/reusable_widgets.dart';
 
 class MealRecordScreen extends StatefulWidget {
@@ -16,6 +17,7 @@ class _MealRecordScreenState extends State<MealRecordScreen> {
   final _formKey = GlobalKey<FormState>();
   DateTime _selectedDate = DateTime.now();
   String _mealType = 'LUNCH';
+  String? _selectedMenuId;
   final _preparedController = TextEditingController(text: "460");
   final _servedController = TextEditingController(text: "440");
   final _leftoverController = TextEditingController(text: "20");
@@ -26,6 +28,7 @@ class _MealRecordScreenState extends State<MealRecordScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<MenuProvider>(context, listen: false).fetchMenus();
       Provider.of<MealProvider>(context, listen: false).fetchMealRecords();
     });
   }
@@ -47,6 +50,7 @@ class _MealRecordScreenState extends State<MealRecordScreen> {
 
     final success = await mealProvider.createMealRecord(
       messId: auth.currentUser?.messId ?? '',
+      menuId: _selectedMenuId,
       date: _selectedDate.toIso8601String().split('T')[0],
       mealType: _mealType,
       preparedQuantity: prep,
@@ -67,6 +71,12 @@ class _MealRecordScreenState extends State<MealRecordScreen> {
   @override
   Widget build(BuildContext context) {
     final mealProvider = Provider.of<MealProvider>(context);
+    final menuProvider = Provider.of<MenuProvider>(context);
+
+    final targetDateStr = _selectedDate.toIso8601String().split('T')[0];
+    final matchingMenus = menuProvider.menus.where(
+      (m) => m.date == targetDateStr && m.mealType == _mealType
+    ).toList();
 
     return Scaffold(
       appBar: AppBar(title: const Text("Meal Consumption Entry")),
@@ -98,9 +108,17 @@ class _MealRecordScreenState extends State<MealRecordScreen> {
                               items: const [
                                 DropdownMenuItem(value: 'BREAKFAST', child: Text("Breakfast")),
                                 DropdownMenuItem(value: 'LUNCH', child: Text("Lunch")),
+                                DropdownMenuItem(value: 'SNACK', child: Text("Snacks")),
                                 DropdownMenuItem(value: 'DINNER', child: Text("Dinner")),
                               ],
-                              onChanged: (v) => setState(() => _mealType = v!),
+                              onChanged: (v) {
+                                if (v != null) {
+                                  setState(() {
+                                    _mealType = v;
+                                    _selectedMenuId = null;
+                                  });
+                                }
+                              },
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -113,7 +131,12 @@ class _MealRecordScreenState extends State<MealRecordScreen> {
                                   firstDate: DateTime.now().subtract(const Duration(days: 30)),
                                   lastDate: DateTime.now(),
                                 );
-                                if (p != null) setState(() => _selectedDate = p);
+                                if (p != null) {
+                                  setState(() {
+                                    _selectedDate = p;
+                                    _selectedMenuId = null;
+                                  });
+                                }
                               },
                               child: InputDecorator(
                                 decoration: const InputDecoration(labelText: "Date"),
@@ -124,6 +147,23 @@ class _MealRecordScreenState extends State<MealRecordScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
+
+                      if (matchingMenus.isNotEmpty) ...[
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedMenuId ?? matchingMenus.first.id,
+                          decoration: const InputDecoration(labelText: "Scheduled Meal / Menu"),
+                          items: matchingMenus.map((m) {
+                            return DropdownMenuItem<String>(
+                              value: m.id,
+                              child: Text(m.menuName, overflow: TextOverflow.ellipsis),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) setState(() => _selectedMenuId = val);
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                      ],
 
                       Row(
                         children: [

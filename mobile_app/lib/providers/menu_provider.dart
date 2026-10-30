@@ -70,4 +70,54 @@ class MenuProvider with ChangeNotifier {
     }
     return false;
   }
+
+  Future<bool> updateMenu({
+    required String menuId,
+    required String menuName,
+    String? specialNotes,
+    required List<Map<String, String>> items,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiClient.dio.patch('/menus/$menuId', data: {
+        'menu_name': menuName,
+        'special_notes': specialNotes,
+        'items': items,
+      });
+
+      if (response.statusCode == 200) {
+        await fetchMenus();
+        return true;
+      }
+    } catch (e) {
+      _errorMessage = "Failed to update menu";
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+    return false;
+  }
+
+  Future<bool> deleteMenu(String menuId) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiClient.dio.delete('/menus/$menuId');
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        await fetchMenus();
+        return true;
+      }
+    } catch (e) {
+      _errorMessage = "Failed to delete menu";
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+    return false;
+  }
 }
