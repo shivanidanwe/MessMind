@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sqlalchemy.orm import Session
-from app.models.models import MealRecord, MealPlan, AttendanceRecord, Menu
+from app.models.models import MealRecord, MealPlan, AttendanceRecord, Menu, ForecastRecord
 
 def predict_demand(
     db: Session,
@@ -27,6 +27,13 @@ def predict_demand(
     ).first()
     target_exp_att = att_rec.expected_attendance if att_rec else 450
 
+    # Get menu for target_date and meal_type if exists
+    target_menu = db.query(Menu).filter(
+        Menu.mess_id == mess_id,
+        Menu.date == target_date,
+        Menu.meal_type == meal_type
+    ).first()
+
     # Get existing meal plan or record for portions already prepared
     existing_plan = db.query(MealPlan).filter(
         MealPlan.mess_id == mess_id,
@@ -43,6 +50,8 @@ def predict_demand(
     if existing_record and existing_record.prepared_quantity > already_prepared:
         already_prepared = existing_record.prepared_quantity
 
+    actual_demand = existing_record.served_quantity if existing_record else None
+
     # If insufficient historical data (< 10 records), use Historical Average Baseline
     if len(records) < 10:
         slot_records = [r for r in records if r.meal_type == meal_type]
@@ -55,12 +64,41 @@ def predict_demand(
         buffer_amount = max(10, int(round(predicted_demand * safety_buffer_percent)))
         recommended_total = predicted_demand + buffer_amount
         additional_needed = max(0, recommended_total - already_prepared)
+        model_name = "Historical Average Baseline"
+
+        # Persist forecast in PostgreSQL
+        f_rec = db.query(ForecastRecord).filter(
+            ForecastRecord.mess_id == mess_id,
+            ForecastRecord.forecast_date == target_date,
+            ForecastRecord.meal_type == meal_type
+        ).first()
+
+        if not f_rec:
+            f_rec = ForecastRecord(
+                mess_id=mess_id,
+                menu_id=target_menu.id if target_menu else None,
+                forecast_date=target_date,
+                meal_type=meal_type,
+                predicted_demand=predicted_demand,
+                recommended_quantity=recommended_total,
+                actual_demand=actual_demand,
+                model_name=model_name
+            )
+            db.add(f_rec)
+        else:
+            f_rec.predicted_demand = predicted_demand
+            f_rec.recommended_quantity = recommended_total
+            if actual_demand is not None:
+                f_rec.actual_demand = actual_demand
+            f_rec.model_name = model_name
+
+        db.commit()
 
         return {
             "target_date": target_date.isoformat(),
             "meal_type": meal_type,
             "predicted_demand": predicted_demand,
-            "forecasting_method": "Historical Average Baseline",
+            "forecasting_method": model_name,
             "model_version": "v1.0-baseline",
             "safety_buffer_portions": buffer_amount,
             "recommended_total_preparation": recommended_total,
@@ -92,7 +130,6 @@ def predict_demand(
     rf_model = RandomForestRegressor(n_estimators=100, random_state=42)
     rf_model.fit(X, y)
 
-    # Feature vector for prediction
     target_dow = target_date.weekday()
     target_is_weekend = 1 if target_dow >= 5 else 0
     meal_type_enc = 0 if meal_type == "BREAKFAST" else (1 if meal_type == "LUNCH" else 2)
@@ -107,7 +144,6 @@ def predict_demand(
     raw_pred = rf_model.predict(pred_input)[0]
     predicted_demand = max(50, int(round(raw_pred)))
 
-    # Compute evaluation metrics (MAE, WAPE, RMSE)
     y_pred_hist = rf_model.predict(X)
     mae = float(np.mean(np.abs(y - y_pred_hist)))
     rmse = float(np.sqrt(np.mean((y - y_pred_hist) ** 2)))
@@ -116,6 +152,35 @@ def predict_demand(
     buffer_amount = max(10, int(round(predicted_demand * safety_buffer_percent)))
     recommended_total = predicted_demand + buffer_amount
     additional_needed = max(0, recommended_total - already_prepared)
+    model_name = "RandomForestRegressor"
+
+    # Persist forecast record in PostgreSQL
+    f_rec = db.query(ForecastRecord).filter(
+        ForecastRecord.mess_id == mess_id,
+        ForecastRecord.forecast_date == target_date,
+        ForecastRecord.meal_type == meal_type
+    ).first()
+
+    if not f_rec:
+        f_rec = ForecastRecord(
+            mess_id=mess_id,
+            menu_id=target_menu.id if target_menu else None,
+            forecast_date=target_date,
+            meal_type=meal_type,
+            predicted_demand=predicted_demand,
+            recommended_quantity=recommended_total,
+            actual_demand=actual_demand,
+            model_name=model_name
+        )
+        db.add(f_rec)
+    else:
+        f_rec.predicted_demand = predicted_demand
+        f_rec.recommended_quantity = recommended_total
+        if actual_demand is not None:
+            f_rec.actual_demand = actual_demand
+        f_rec.model_name = model_name
+
+    db.commit()
 
     return {
         "target_date": target_date.isoformat(),

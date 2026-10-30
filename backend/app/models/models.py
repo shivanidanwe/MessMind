@@ -168,6 +168,23 @@ class MealRecord(Base):
     recorder = relationship("User")
     waste_records = relationship("WasteRecord", back_populates="meal_record")
 
+class ForecastRecord(Base):
+    __tablename__ = "forecast_records"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    mess_id = Column(String(36), ForeignKey("messes.id", ondelete="CASCADE"), nullable=False, index=True)
+    menu_id = Column(String(36), ForeignKey("menus.id", ondelete="SET NULL"), nullable=True)
+    forecast_date = Column(Date, nullable=False, index=True)
+    meal_type = Column(String(50), nullable=False)
+    predicted_demand = Column(Integer, nullable=False, default=0)
+    recommended_quantity = Column(Integer, nullable=False, default=0)
+    actual_demand = Column(Integer, nullable=True)
+    model_name = Column(String(100), nullable=False, default="RandomForestRegressor")
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    mess = relationship("Mess")
+    menu = relationship("Menu")
+
 class Ingredient(Base):
     __tablename__ = "ingredients"
 
