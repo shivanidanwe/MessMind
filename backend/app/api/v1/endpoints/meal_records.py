@@ -3,8 +3,8 @@ from typing import List, Optional
 from datetime import date
 from sqlalchemy.orm import Session
 from app.database.session import get_db
-from app.models.models import MealRecord, User, UserRole, WasteRecord, WasteCategory
-from app.core.permissions import require_any_user
+from app.models.models import MealRecord, User, WasteRecord, WasteCategory
+from app.core.permissions import require_manager
 from app.schemas.schemas import MealRecordCreate, MealRecordUpdate, MealRecordResponse
 
 router = APIRouter()
@@ -13,12 +13,10 @@ router = APIRouter()
 def get_meal_records(
     target_date: Optional[date] = None,
     meal_type: Optional[str] = None,
-    current_user: User = Depends(require_any_user),
+    current_user: User = Depends(require_manager),
     db: Session = Depends(get_db)
 ):
-    query = db.query(MealRecord)
-    if current_user.role != UserRole.ADMIN.value:
-        query = query.filter(MealRecord.mess_id == current_user.mess_id)
+    query = db.query(MealRecord).filter(MealRecord.mess_id == current_user.mess_id)
     if target_date:
         query = query.filter(MealRecord.date == target_date)
     if meal_type:
@@ -28,12 +26,11 @@ def get_meal_records(
 @router.post("", response_model=MealRecordResponse, status_code=status.HTTP_201_CREATED)
 def create_meal_record(
     record_in: MealRecordCreate,
-    current_user: User = Depends(require_any_user),
+    current_user: User = Depends(require_manager),
     db: Session = Depends(get_db)
 ):
     target_mess_id = record_in.mess_id or current_user.mess_id
 
-    # Validation rules
     if record_in.prepared_quantity < 0 or record_in.served_quantity < 0:
         raise HTTPException(status_code=400, detail="Prepared and served quantities cannot be negative")
     if record_in.served_quantity > record_in.prepared_quantity:
@@ -58,7 +55,6 @@ def create_meal_record(
     db.commit()
     db.refresh(record)
 
-    # Automatically create waste record if discarded_quantity_kg > 0
     if record_in.discarded_quantity_kg > 0:
         waste = WasteRecord(
             mess_id=target_mess_id,
@@ -80,13 +76,13 @@ def create_meal_record(
 def update_meal_record(
     record_id: str,
     record_update: MealRecordUpdate,
-    current_user: User = Depends(require_any_user),
+    current_user: User = Depends(require_manager),
     db: Session = Depends(get_db)
 ):
     record = db.query(MealRecord).filter(MealRecord.id == record_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Meal record not found")
-    if current_user.role != UserRole.ADMIN.value and record.mess_id != current_user.mess_id:
+    if record.mess_id != current_user.mess_id:
         raise HTTPException(status_code=403, detail="Not authorized to edit this record")
 
     if record_update.prepared_quantity is not None:

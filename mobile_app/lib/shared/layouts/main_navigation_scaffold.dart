@@ -8,9 +8,7 @@ class MainNavigationScaffold extends StatelessWidget {
 
   int _calculateSelectedIndex(BuildContext context) {
     final String location = GoRouterState.of(context).uri.path;
-    if (location.startsWith('/home') || location.startsWith('/admin-dashboard') || location.startsWith('/manager-dashboard') || location.startsWith('/staff-dashboard')) {
-      return 0;
-    }
+    if (location.startsWith('/home')) return 0;
     if (location.startsWith('/menus')) return 1;
     if (location.startsWith('/forecast')) return 2;
     if (location.startsWith('/records') || location.startsWith('/meal-records')) return 3;

@@ -13,8 +13,8 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _emailController = TextEditingController(text: "manager@messmind.com");
+  final _passwordController = TextEditingController(text: "ManagerPassword123!");
   bool _obscurePassword = true;
 
   void _submit() async {
@@ -27,20 +27,8 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success && mounted) {
-      final role = authProvider.currentUser?.role ?? 'STAFF';
-      if (role == 'ADMIN') {
-        context.go('/admin-dashboard');
-      } else if (role == 'MANAGER') {
-        context.go('/manager-dashboard');
-      } else {
-        context.go('/staff-dashboard');
-      }
+      context.go('/home');
     }
-  }
-
-  void _fillPreset(String email, String pass) {
-    _emailController.text = email;
-    _passwordController.text = pass;
   }
 
   @override
@@ -70,7 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  "MessMind Login",
+                  "Mess Manager Login",
                   style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.bold,
@@ -79,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  "Sign in to your mess management dashboard",
+                  "Sign in to access your canteen management portal",
                   style: TextStyle(
                     fontSize: 14,
                     color: AppColors.textSecondary,
@@ -128,7 +116,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
                             decoration: const InputDecoration(
-                              hintText: "user@messmind.com",
+                              hintText: "manager@messmind.com",
                               prefixIcon: Icon(Icons.email_outlined),
                             ),
                             validator: (val) {
@@ -174,38 +162,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                     width: 20,
                                     child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                                   )
-                                : const Text("Sign In"),
+                                : const Text("Sign In as Mess Manager"),
                           ),
                         ],
                       ),
                     ),
                   ),
-                ),
-
-                const SizedBox(height: 24),
-                const Text(
-                  "Quick Demo Sign-In",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    OutlinedButton(
-                      onPressed: () => _fillPreset("admin@messmind.com", "AdminPassword123!"),
-                      child: const Text("Admin"),
-                    ),
-                    const SizedBox(width: 8),
-                    OutlinedButton(
-                      onPressed: () => _fillPreset("manager@messmind.com", "ManagerPassword123!"),
-                      child: const Text("Manager"),
-                    ),
-                    const SizedBox(width: 8),
-                    OutlinedButton(
-                      onPressed: () => _fillPreset("staff1@messmind.com", "StaffPassword123!"),
-                      child: const Text("Staff"),
-                    ),
-                  ],
                 ),
               ],
             ),

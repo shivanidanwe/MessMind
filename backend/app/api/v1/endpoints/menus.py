@@ -4,7 +4,7 @@ from datetime import date
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.models.models import Menu, MenuItem, User, UserRole, AuditLog
-from app.core.permissions import require_any_user, require_manager_or_admin
+from app.core.permissions import require_manager
 from app.schemas.schemas import MenuCreate, MenuUpdate, MenuResponse
 
 router = APIRouter()
@@ -13,12 +13,10 @@ router = APIRouter()
 def list_menus(
     target_date: Optional[date] = None,
     meal_type: Optional[str] = None,
-    current_user: User = Depends(require_any_user),
+    current_user: User = Depends(require_manager),
     db: Session = Depends(get_db)
 ):
-    query = db.query(Menu)
-    if current_user.role != UserRole.ADMIN.value:
-        query = query.filter(Menu.mess_id == current_user.mess_id)
+    query = db.query(Menu).filter(Menu.mess_id == current_user.mess_id)
     if target_date:
         query = query.filter(Menu.date == target_date)
     if meal_type:
@@ -28,11 +26,10 @@ def list_menus(
 @router.post("", response_model=MenuResponse, status_code=status.HTTP_201_CREATED)
 def create_menu(
     menu_in: MenuCreate,
-    current_user: User = Depends(require_manager_or_admin),
+    current_user: User = Depends(require_manager),
     db: Session = Depends(get_db)
 ):
     target_mess_id = menu_in.mess_id or current_user.mess_id
-    # Check duplicate menu for same mess, date, and meal slot
     existing = db.query(Menu).filter(
         Menu.mess_id == target_mess_id,
         Menu.date == menu_in.date,
@@ -84,13 +81,13 @@ def create_menu(
 @router.get("/{menu_id}", response_model=MenuResponse)
 def get_menu(
     menu_id: str,
-    current_user: User = Depends(require_any_user),
+    current_user: User = Depends(require_manager),
     db: Session = Depends(get_db)
 ):
     menu = db.query(Menu).filter(Menu.id == menu_id).first()
     if not menu:
         raise HTTPException(status_code=404, detail="Menu not found")
-    if current_user.role != UserRole.ADMIN.value and menu.mess_id != current_user.mess_id:
+    if menu.mess_id != current_user.mess_id:
         raise HTTPException(status_code=403, detail="Not authorized to view this menu")
     return menu
 
@@ -98,13 +95,13 @@ def get_menu(
 def update_menu(
     menu_id: str,
     menu_update: MenuUpdate,
-    current_user: User = Depends(require_manager_or_admin),
+    current_user: User = Depends(require_manager),
     db: Session = Depends(get_db)
 ):
     menu = db.query(Menu).filter(Menu.id == menu_id).first()
     if not menu:
         raise HTTPException(status_code=404, detail="Menu not found")
-    if current_user.role != UserRole.ADMIN.value and menu.mess_id != current_user.mess_id:
+    if menu.mess_id != current_user.mess_id:
         raise HTTPException(status_code=403, detail="Not authorized to update this menu")
 
     if menu_update.menu_name is not None:
@@ -115,7 +112,6 @@ def update_menu(
         menu.status = menu_update.status.value if hasattr(menu_update.status, "value") else menu_update.status
 
     if menu_update.items is not None:
-        # replace items
         db.query(MenuItem).filter(MenuItem.menu_id == menu_id).delete()
         for item_in in menu_update.items:
             item = MenuItem(
@@ -133,13 +129,13 @@ def update_menu(
 @router.delete("/{menu_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_menu(
     menu_id: str,
-    current_user: User = Depends(require_manager_or_admin),
+    current_user: User = Depends(require_manager),
     db: Session = Depends(get_db)
 ):
     menu = db.query(Menu).filter(Menu.id == menu_id).first()
     if not menu:
         raise HTTPException(status_code=404, detail="Menu not found")
-    if current_user.role != UserRole.ADMIN.value and menu.mess_id != current_user.mess_id:
+    if menu.mess_id != current_user.mess_id:
         raise HTTPException(status_code=403, detail="Not authorized to delete this menu")
 
     db.delete(menu)

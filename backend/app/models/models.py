@@ -9,9 +9,7 @@ from app.database.base import Base
 import enum
 
 class UserRole(str, enum.Enum):
-    ADMIN = "ADMIN"
-    MANAGER = "MANAGER"
-    STAFF = "STAFF"
+    MESS_MANAGER = "MESS_MANAGER"
 
 class MealType(str, enum.Enum):
     BREAKFAST = "BREAKFAST"
@@ -66,7 +64,7 @@ class User(Base):
     full_name = Column(String(150), nullable=False)
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
-    role = Column(String(50), nullable=False, default=UserRole.STAFF.value)
+    role = Column(String(50), nullable=False, default=UserRole.MESS_MANAGER.value)
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

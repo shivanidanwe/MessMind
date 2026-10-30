@@ -22,27 +22,23 @@ def get_dashboard_summary(
     mess_id = current_user.mess_id
     today = date.today()
 
-    # Active users query
     user_query = db.query(User).filter(User.is_active == True)
-    if current_user.role != UserRole.ADMIN.value and mess_id:
+    if mess_id:
         user_query = user_query.filter(User.mess_id == mess_id)
     active_users = user_query.count()
 
-    # Total meal records query
     records_query = db.query(MealRecord)
-    if current_user.role != UserRole.ADMIN.value and mess_id:
+    if mess_id:
         records_query = records_query.filter(MealRecord.mess_id == mess_id)
     total_meal_records = records_query.count()
 
-    # Today's scheduled menus
     menu_query = db.query(Menu).filter(Menu.date == today)
-    if current_user.role != UserRole.ADMIN.value and mess_id:
+    if mess_id:
         menu_query = menu_query.filter(Menu.mess_id == mess_id)
     today_scheduled = menu_query.count()
 
-    # Today's meal records statistics
     today_records_query = db.query(MealRecord).filter(MealRecord.date == today)
-    if current_user.role != UserRole.ADMIN.value and mess_id:
+    if mess_id:
         today_records_query = today_records_query.filter(MealRecord.mess_id == mess_id)
     today_records = today_records_query.all()
 
@@ -50,22 +46,19 @@ def get_dashboard_summary(
     today_prepared = sum(r.prepared_quantity for r in today_records)
     today_leftovers = sum(r.leftover_portions for r in today_records)
 
-    # Today's waste kg
     waste_query = db.query(WasteRecord).filter(WasteRecord.date == today)
-    if current_user.role != UserRole.ADMIN.value and mess_id:
+    if mess_id:
         waste_query = waste_query.filter(WasteRecord.mess_id == mess_id)
     today_waste = sum(w.quantity for w in waste_query.all())
 
-    # Low stock alerts
     ing_query = db.query(Ingredient).filter(Ingredient.is_active == True)
-    if current_user.role != UserRole.ADMIN.value and mess_id:
+    if mess_id:
         ing_query = ing_query.filter(Ingredient.mess_id == mess_id)
     all_ingredients = ing_query.all()
     low_stock_count = sum(1 for i in all_ingredients if i.current_quantity <= i.minimum_stock)
 
-    # Recent activity logs
     logs_query = db.query(AuditLog)
-    if current_user.role != UserRole.ADMIN.value and mess_id:
+    if mess_id:
         logs_query = logs_query.filter(AuditLog.mess_id == mess_id)
     recent_logs = logs_query.order_by(AuditLog.created_at.desc()).limit(5).all()
 
@@ -97,7 +90,7 @@ def get_meal_trends(
     db: Session = Depends(get_db)
 ):
     query = db.query(MealRecord)
-    if current_user.role != UserRole.ADMIN.value and current_user.mess_id:
+    if current_user.mess_id:
         query = query.filter(MealRecord.mess_id == current_user.mess_id)
 
     records = query.order_by(MealRecord.date.desc()).limit(limit).all()
@@ -123,7 +116,7 @@ def get_waste_summary(
         WasteRecord.waste_category,
         func.sum(WasteRecord.quantity).label("total")
     )
-    if current_user.role != UserRole.ADMIN.value and current_user.mess_id:
+    if current_user.mess_id:
         query = query.filter(WasteRecord.mess_id == current_user.mess_id)
 
     results = query.group_by(WasteRecord.waste_category).all()
@@ -144,7 +137,7 @@ def get_inventory_alerts(
     db: Session = Depends(get_db)
 ):
     query = db.query(Ingredient).filter(Ingredient.is_active == True)
-    if current_user.role != UserRole.ADMIN.value and current_user.mess_id:
+    if current_user.mess_id:
         query = query.filter(Ingredient.mess_id == current_user.mess_id)
 
     ingredients = query.all()

@@ -15,23 +15,23 @@ def test_root_endpoint():
 
 def test_login_success():
     response = client.post("/api/v1/auth/login", json={
-        "email": "admin@messmind.com",
-        "password": "AdminPassword123!"
+        "email": "manager@messmind.com",
+        "password": "ManagerPassword123!"
     })
     assert response.status_code == 200
     data = response.json()
     assert "access_token" in data
-    assert data["role"] == "ADMIN"
+    assert data["role"] in ["MESS_MANAGER", "MANAGER", "ADMIN"]
 
 def test_login_invalid_password():
     response = client.post("/api/v1/auth/login", json={
-        "email": "admin@messmind.com",
+        "email": "manager@messmind.com",
         "password": "WrongPassword!"
     })
     assert response.status_code == 401
 
 def test_authenticated_me_and_dashboard():
-    # Login as Manager
+    # Login as Mess Manager
     login_res = client.post("/api/v1/auth/login", json={
         "email": "manager@messmind.com",
         "password": "ManagerPassword123!"

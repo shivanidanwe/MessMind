@@ -34,17 +34,19 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     return user
 
 class RoleChecker:
-    def __init__(self, allowed_roles: list[UserRole]):
-        self.allowed_roles = [r.value if isinstance(r, UserRole) else r for r in allowed_roles]
+    def __init__(self, allowed_roles: list[str]):
+        self.allowed_roles = allowed_roles
 
     def __call__(self, current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in self.allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"User role '{current_user.role}' is not authorized to perform this operation"
+                detail=f"User role '{current_user.role}' is not authorized. Only MESS_MANAGER role is allowed."
             )
         return current_user
 
-require_admin = RoleChecker([UserRole.ADMIN])
-require_manager_or_admin = RoleChecker([UserRole.ADMIN, UserRole.MANAGER])
-require_any_user = RoleChecker([UserRole.ADMIN, UserRole.MANAGER, UserRole.STAFF])
+# Allow MESS_MANAGER (as well as legacy MANAGER and ADMIN)
+require_manager = RoleChecker(["MESS_MANAGER", "MANAGER", "ADMIN"])
+require_admin = require_manager
+require_manager_or_admin = require_manager
+require_any_user = require_manager

@@ -5,8 +5,8 @@ from typing import Optional
 from datetime import date
 from sqlalchemy.orm import Session
 from app.database.session import get_db
-from app.models.models import MealRecord, WasteRecord, Ingredient, User, UserRole
-from app.core.permissions import require_manager_or_admin
+from app.models.models import MealRecord, WasteRecord, Ingredient, User
+from app.core.permissions import require_manager
 
 router = APIRouter()
 
@@ -14,15 +14,11 @@ router = APIRouter()
 def get_reports_summary(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
-    current_user: User = Depends(require_manager_or_admin),
+    current_user: User = Depends(require_manager),
     db: Session = Depends(get_db)
 ):
-    query_meals = db.query(MealRecord)
-    query_waste = db.query(WasteRecord)
-
-    if current_user.role != UserRole.ADMIN.value and current_user.mess_id:
-        query_meals = query_meals.filter(MealRecord.mess_id == current_user.mess_id)
-        query_waste = query_waste.filter(WasteRecord.mess_id == current_user.mess_id)
+    query_meals = db.query(MealRecord).filter(MealRecord.mess_id == current_user.mess_id)
+    query_waste = db.query(WasteRecord).filter(WasteRecord.mess_id == current_user.mess_id)
 
     if start_date:
         query_meals = query_meals.filter(MealRecord.date >= start_date)
@@ -56,7 +52,7 @@ def export_reports_csv(
     report_type: str = "consumption",
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
-    current_user: User = Depends(require_manager_or_admin),
+    current_user: User = Depends(require_manager),
     db: Session = Depends(get_db)
 ):
     output = io.StringIO()
@@ -72,9 +68,7 @@ def export_reports_csv(
 
     if report_type == "consumption":
         writer.writerow(["Date", "Meal Type", "Prepared Qty", "Served Qty", "Leftover Portions", "Discarded Kg", "Notes"])
-        query = db.query(MealRecord)
-        if current_user.role != UserRole.ADMIN.value and current_user.mess_id:
-            query = query.filter(MealRecord.mess_id == current_user.mess_id)
+        query = db.query(MealRecord).filter(MealRecord.mess_id == current_user.mess_id)
         if start_date:
             query = query.filter(MealRecord.date >= start_date)
         if end_date:
@@ -93,9 +87,7 @@ def export_reports_csv(
 
     elif report_type == "waste":
         writer.writerow(["Date", "Meal Type", "Food Item", "Quantity (kg)", "Waste Category", "Reason"])
-        query = db.query(WasteRecord)
-        if current_user.role != UserRole.ADMIN.value and current_user.mess_id:
-            query = query.filter(WasteRecord.mess_id == current_user.mess_id)
+        query = db.query(WasteRecord).filter(WasteRecord.mess_id == current_user.mess_id)
         if start_date:
             query = query.filter(WasteRecord.date >= start_date)
         if end_date:
@@ -112,9 +104,7 @@ def export_reports_csv(
             ])
     else:
         writer.writerow(["Ingredient", "Category", "Current Stock", "Min Stock", "Unit", "Unit Cost"])
-        query = db.query(Ingredient)
-        if current_user.role != UserRole.ADMIN.value and current_user.mess_id:
-            query = query.filter(Ingredient.mess_id == current_user.mess_id)
+        query = db.query(Ingredient).filter(Ingredient.mess_id == current_user.mess_id)
 
         for ing in query.order_by(Ingredient.name.asc()).all():
             writer.writerow([

@@ -92,7 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Hello, ${auth.currentUser?.fullName ?? 'Manager'}",
+                        "Hello, ${auth.currentUser?.fullName ?? 'Mess Manager'}",
                         style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 2),
@@ -102,7 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ],
                   ),
-                  RoleBadge(role: auth.currentUser?.role ?? 'STAFF'),
+                  const RoleBadge(role: "MANAGER"),
                 ],
               ),
               const SizedBox(height: 16),

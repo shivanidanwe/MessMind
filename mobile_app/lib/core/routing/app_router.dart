@@ -10,7 +10,6 @@ import '../../features/inventory/inventory_screen.dart';
 import '../../features/waste/waste_record_screen.dart';
 import '../../features/reports/reports_screen.dart';
 import '../../features/profile/profile_screen.dart';
-import '../../features/administration/user_management_screen.dart';
 import '../../shared/layouts/main_navigation_scaffold.dart';
 
 class AppRouter {
@@ -26,24 +25,12 @@ class AppRouter {
         builder: (context, state) => const LoginScreen(),
       ),
 
-      // 5 Main Navigation Destinations
+      // 5 Primary Navigation Destinations
       ShellRoute(
         builder: (context, state, child) => MainNavigationScaffold(child: child),
         routes: [
           GoRoute(
             path: '/home',
-            builder: (context, state) => const HomeScreen(),
-          ),
-          GoRoute(
-            path: '/admin-dashboard',
-            builder: (context, state) => const HomeScreen(),
-          ),
-          GoRoute(
-            path: '/manager-dashboard',
-            builder: (context, state) => const HomeScreen(),
-          ),
-          GoRoute(
-            path: '/staff-dashboard',
             builder: (context, state) => const HomeScreen(),
           ),
           GoRoute(
@@ -69,7 +56,7 @@ class AppRouter {
         ],
       ),
 
-      // Secondary Utility Screens
+      // Secondary Manager Utilities
       GoRoute(
         path: '/meal-planning',
         builder: (context, state) => const MealPlanScreen(),
@@ -85,10 +72,6 @@ class AppRouter {
       GoRoute(
         path: '/reports',
         builder: (context, state) => const ReportsScreen(),
-      ),
-      GoRoute(
-        path: '/users',
-        builder: (context, state) => const UserManagementScreen(),
       ),
     ],
   );

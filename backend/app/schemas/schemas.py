@@ -10,7 +10,7 @@ class Token(BaseModel):
     user_id: str
     email: str
     full_name: str
-    role: UserRole
+    role: str = "MESS_MANAGER"
     mess_id: Optional[str] = None
 
 class TokenData(BaseModel):
@@ -44,11 +44,11 @@ class UserCreate(BaseModel):
     full_name: str
     email: EmailStr
     password: str = Field(..., min_length=6)
-    role: UserRole = UserRole.STAFF
+    role: str = "MESS_MANAGER"
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
-    role: Optional[UserRole] = None
+    role: Optional[str] = None
     is_active: Optional[bool] = None
 
 class UserResponse(BaseModel):
@@ -56,7 +56,7 @@ class UserResponse(BaseModel):
     mess_id: Optional[str] = None
     full_name: str
     email: EmailStr
-    role: UserRole
+    role: str
     is_active: bool
     created_at: datetime
 

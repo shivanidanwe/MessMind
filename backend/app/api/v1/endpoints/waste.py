@@ -3,8 +3,8 @@ from typing import List, Optional
 from datetime import date
 from sqlalchemy.orm import Session
 from app.database.session import get_db
-from app.models.models import WasteRecord, User, UserRole
-from app.core.permissions import require_any_user
+from app.models.models import WasteRecord, User
+from app.core.permissions import require_manager
 from app.schemas.schemas import WasteRecordCreate, WasteRecordUpdate, WasteRecordResponse
 
 router = APIRouter()
@@ -14,12 +14,10 @@ def get_waste_records(
     target_date: Optional[date] = None,
     meal_type: Optional[str] = None,
     category: Optional[str] = None,
-    current_user: User = Depends(require_any_user),
+    current_user: User = Depends(require_manager),
     db: Session = Depends(get_db)
 ):
-    query = db.query(WasteRecord)
-    if current_user.role != UserRole.ADMIN.value:
-        query = query.filter(WasteRecord.mess_id == current_user.mess_id)
+    query = db.query(WasteRecord).filter(WasteRecord.mess_id == current_user.mess_id)
     if target_date:
         query = query.filter(WasteRecord.date == target_date)
     if meal_type:
@@ -31,7 +29,7 @@ def get_waste_records(
 @router.post("", response_model=WasteRecordResponse, status_code=status.HTTP_201_CREATED)
 def record_food_waste(
     waste_in: WasteRecordCreate,
-    current_user: User = Depends(require_any_user),
+    current_user: User = Depends(require_manager),
     db: Session = Depends(get_db)
 ):
     target_mess_id = waste_in.mess_id or current_user.mess_id
@@ -62,13 +60,13 @@ def record_food_waste(
 def update_waste_record(
     record_id: str,
     waste_update: WasteRecordUpdate,
-    current_user: User = Depends(require_any_user),
+    current_user: User = Depends(require_manager),
     db: Session = Depends(get_db)
 ):
     waste = db.query(WasteRecord).filter(WasteRecord.id == record_id).first()
     if not waste:
         raise HTTPException(status_code=404, detail="Waste record not found")
-    if current_user.role != UserRole.ADMIN.value and waste.mess_id != current_user.mess_id:
+    if waste.mess_id != current_user.mess_id:
         raise HTTPException(status_code=403, detail="Not authorized to edit this record")
 
     if waste_update.quantity is not None:

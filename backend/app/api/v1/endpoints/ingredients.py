@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from app.database.session import get_db
-from app.models.models import Ingredient, InventoryTransaction, InventoryTransactionType, User, UserRole
-from app.core.permissions import require_any_user, require_manager_or_admin
+from app.models.models import Ingredient, InventoryTransaction, InventoryTransactionType, User
+from app.core.permissions import require_manager
 from app.schemas.schemas import (
     IngredientCreate, IngredientUpdate, IngredientResponse,
     InventoryTransactionCreate, InventoryTransactionResponse
@@ -15,12 +15,10 @@ router = APIRouter()
 def get_ingredients(
     category: Optional[str] = None,
     is_active: Optional[bool] = None,
-    current_user: User = Depends(require_any_user),
+    current_user: User = Depends(require_manager),
     db: Session = Depends(get_db)
 ):
-    query = db.query(Ingredient)
-    if current_user.role != UserRole.ADMIN.value:
-        query = query.filter(Ingredient.mess_id == current_user.mess_id)
+    query = db.query(Ingredient).filter(Ingredient.mess_id == current_user.mess_id)
     if category:
         query = query.filter(Ingredient.category == category)
     if is_active is not None:
@@ -30,7 +28,7 @@ def get_ingredients(
 @router.post("/ingredients", response_model=IngredientResponse, status_code=status.HTTP_201_CREATED)
 def create_ingredient(
     ingredient_in: IngredientCreate,
-    current_user: User = Depends(require_manager_or_admin),
+    current_user: User = Depends(require_manager),
     db: Session = Depends(get_db)
 ):
     target_mess_id = ingredient_in.mess_id or current_user.mess_id
@@ -53,13 +51,13 @@ def create_ingredient(
 def update_ingredient(
     ingredient_id: str,
     ingredient_update: IngredientUpdate,
-    current_user: User = Depends(require_manager_or_admin),
+    current_user: User = Depends(require_manager),
     db: Session = Depends(get_db)
 ):
     ingredient = db.query(Ingredient).filter(Ingredient.id == ingredient_id).first()
     if not ingredient:
         raise HTTPException(status_code=404, detail="Ingredient not found")
-    if current_user.role != UserRole.ADMIN.value and ingredient.mess_id != current_user.mess_id:
+    if ingredient.mess_id != current_user.mess_id:
         raise HTTPException(status_code=403, detail="Not authorized to update this ingredient")
 
     if ingredient_update.name is not None:
@@ -84,7 +82,7 @@ def update_ingredient(
 @router.get("/inventory/transactions", response_model=List[InventoryTransactionResponse])
 def get_inventory_transactions(
     ingredient_id: Optional[str] = None,
-    current_user: User = Depends(require_any_user),
+    current_user: User = Depends(require_manager),
     db: Session = Depends(get_db)
 ):
     query = db.query(InventoryTransaction)
@@ -95,18 +93,17 @@ def get_inventory_transactions(
 @router.post("/inventory/transactions", response_model=InventoryTransactionResponse, status_code=status.HTTP_201_CREATED)
 def record_inventory_transaction(
     trans_in: InventoryTransactionCreate,
-    current_user: User = Depends(require_any_user),
+    current_user: User = Depends(require_manager),
     db: Session = Depends(get_db)
 ):
     ingredient = db.query(Ingredient).filter(Ingredient.id == trans_in.ingredient_id).first()
     if not ingredient:
         raise HTTPException(status_code=404, detail="Ingredient not found")
-    if current_user.role != UserRole.ADMIN.value and ingredient.mess_id != current_user.mess_id:
+    if ingredient.mess_id != current_user.mess_id:
         raise HTTPException(status_code=403, detail="Not authorized for this ingredient")
 
     tx_type = trans_in.transaction_type.value if hasattr(trans_in.transaction_type, "value") else trans_in.transaction_type
 
-    # Atomic stock adjustment calculation
     if tx_type == InventoryTransactionType.STOCK_IN.value:
         ingredient.current_quantity += trans_in.quantity
     elif tx_type == InventoryTransactionType.USAGE.value:
